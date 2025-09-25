@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Match Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .card {
+  perspective: 1000px;
+}
+.card-inner {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+.card.flipped .card-inner {
+  transform: rotateY(180deg);
+}
+.card-front, .card-back {
+  backface-visibility: hidden;
+}
+.card-front {
+  transform: rotateY(180deg);
+}
+
+  </style>
+  
+
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+
+  <!-- Header -->
+  <header class="flex justify-between items-center w-full max-w-2xl px-6 py-4 bg-indigo-600 text-white rounded-md shadow-md">
+    <h1 class="text-xl font-bold">Memory Match Game</h1>
+    <button id="restartBtn" class="bg-white text-indigo-600 px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition">
+      Restart
+    </button>
+  </header>
+
+  <!-- Game Board -->
+  <main class="mt-6 w-full max-w-2xl">
+    <div id="game-board" class="grid grid-cols-4 gap-4"></div>
+  </main>
+
+  <script src="index.js"></script>
+</body>
+</html>
+
+
