@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Income Expense Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card-shadow {
+            box-shadow: 0 6px 18px rgba(17, 24, 39, 0.08);
+        }
+
+        .income {
+            color: #047857;
+        }
+
+        .expense {
+            color: #b91c1c;
+        }
+
+        .muted {
+            color: #6b7280;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen flex items-start justify-center py-10">
+    <div class="w-full max-w-4xl px-4">
+        <header class="mb-6">
+            <h1 class="text-3xl font-extrabold text-gray-900">Income & Expense Calculator</h1>
+
+        </header>
+
+        <main class="grid gap-6 lg:grid-cols-2">
+            <!-- LEFT: Form  -->
+            <section class="bg-white p-6 rounded-2xl card-shadow">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Add Entry</h2>
+                    <div class="text-sm muted">Local storage key: <code
+                            class="text-xs bg-gray-100 px-2 py-1 rounded">ie_entries_v1</code></div>
+                </div>
+
+                <form id="entry-form" class="space-y-4">
+                    <input type="hidden" id="entry-id" />
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Description</label>
+                        <input id="desc" type="text" placeholder="e.g., Salary, Groceries"
+                            class="w-full rounded-md border-gray-200 shadow-sm focus:ring-2 focus:ring-indigo-200 p-2"
+                            required />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Amount</label>
+                        <input id="amount" type="number" step="0.01" placeholder="0.00"
+                            class="w-full rounded-md border-gray-200 shadow-sm focus:ring-2 focus:ring-indigo-200 p-2"
+                            required />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Type</label>
+                        <select id="type"
+                            class="w-full rounded-md border-gray-200 shadow-sm focus:ring-2 focus:ring-indigo-200 p-2">
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="save-btn"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700">Add</button>
+                        <button id="reset-btn" type="button" class="px-4 py-2 bg-gray-100 rounded-md">Reset</button>
+                        <button id="readme-btn" type="button" class="ml-auto text-sm text-indigo-600">README</button>
+                    </div>
+                </form>
+
+                <hr class="my-6">
+
+                <div class="space-y-3">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="p-3 rounded-lg bg-green-50">
+                            <div class="text-xs text-muted">Total Income</div>
+                            <div id="total-income" class="text-xl font-bold income">₹0.00</div>
+                        </div>
+
+                        <div class="p-3 rounded-lg bg-red-50">
+                            <div class="text-xs text-muted">Total Expenses</div>
+                            <div id="total-expense" class="text-xl font-bold expense">₹0.00</div>
+                        </div>
+
+                        <div class="p-3 rounded-lg bg-indigo-50">
+                            <div class="text-xs text-muted">Net Balance</div>
+                            <div id="net-balance" class="text-xl font-bold">₹0.00</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="text-sm font-medium mb-2">Filter</div>
+                        <div class="flex items-center gap-4">
+                            <label class="flex items-center gap-2"><input type="radio" name="filter" value="all"
+                                    checked /> All</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="filter" value="income" />
+                                Income</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="filter" value="expense" />
+                                Expense</label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Entries List -->
+            <section class="bg-white p-6 rounded-2xl card-shadow flex flex-col">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Entries</h2>
+                    <div class="text-sm muted">Click edit to modify an entry.</div>
+                </div>
+
+                <div id="entries-container" class="space-y-3 overflow-auto">
+                    <!-- entries appended here -->
+                </div>
+
+                <div class="mt-4 text-sm muted">Data stored locally in your browser.
+                </div>
+            </section>
+        </main>
+
+
+
+        <script>
+            // Key for localStorage
+            const STORAGE_KEY = 'ie_entries_v1';
+
+            //format currency
+            function fmtCurrency(num) {
+                const n = Number(num) || 0;
+                return n.toLocaleString(undefined, { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
+            }
+
+            // DOM 
+            const form = document.getElementById('entry-form');
+            const descInput = document.getElementById('desc');
+            const amountInput = document.getElementById('amount');
+            const typeInput = document.getElementById('type');
+            const entriesContainer = document.getElementById('entries-container');
+            const totalIncomeEl = document.getElementById('total-income');
+            const totalExpenseEl = document.getElementById('total-expense');
+            const netBalanceEl = document.getElementById('net-balance');
+            const entryIdInput = document.getElementById('entry-id');
+            const resetBtn = document.getElementById('reset-btn');
+
+
+            // App state
+            let entries = [];
+            let currentFilter = 'all';
+
+            // Load from storage on start
+            function loadEntries() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    entries = raw ? JSON.parse(raw) : [];
+                } catch (e) {
+                    console.error('Failed to parse entries from storage', e);
+                    entries = [];
+                }
+            }
+
+            // Save to storage
+            function saveEntries() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+            }
+
+            // update entry
+            function upsertEntry(e) {
+                e.preventDefault();
+                const desc = descInput.value.trim();
+                const amount = parseFloat(amountInput.value);
+                const type = typeInput.value;
+
+                if (!desc) { alert('Please enter a description'); return; }
+                if (isNaN(amount) || amount === 0) { alert('Please enter a non-zero amount'); return; }
+
+                const editingId = entryIdInput.value;
+                if (editingId) {
+                    // Update
+                    const idx = entries.findIndex(it => it.id === editingId);
+                    if (idx !== -1) {
+                        entries[idx].description = desc;
+                        entries[idx].amount = amount;
+                        entries[idx].type = type;
+                        entries[idx].updatedAt = Date.now();
+                    }
+                } else {
+                    // Create
+                    const id = String(Date.now()) + Math.random().toString(16).slice(2, 8);
+                    entries.unshift({ id, description: desc, amount, type, createdAt: Date.now() });
+                }
+
+                // persist & refresh
+                saveEntries();
+                render();
+                form.reset();
+                entryIdInput.value = '';
+                document.getElementById('save-btn').textContent = 'Add';
+            }
+
+            // Delete entry
+            function deleteEntry(id) {
+                if (!confirm('Delete this entry?')) return;
+                entries = entries.filter(it => it.id !== id);
+                saveEntries();
+                render();
+            }
+
+            // Edit entry: load into form
+            function editEntry(id) {
+                const it = entries.find(e => e.id === id);
+                if (!it) return;
+                descInput.value = it.description;
+                amountInput.value = it.amount;
+                typeInput.value = it.type;
+                entryIdInput.value = it.id;
+                document.getElementById('save-btn').textContent = 'Save';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            // Compute totals and update UI
+            function computeTotals(list) {
+                let income = 0, expense = 0;
+                list.forEach(it => {
+                    if (it.type === 'income') income += Number(it.amount) || 0;
+                    else expense += Number(it.amount) || 0;
+                });
+                totalIncomeEl.textContent = fmtCurrency(income);
+                totalExpenseEl.textContent = fmtCurrency(expense);
+                netBalanceEl.textContent = fmtCurrency(income - expense);
+                netBalanceEl.classList.toggle('income', income - expense >= 0);
+                netBalanceEl.classList.toggle('expense', income - expense < 0);
+            }
+
+            // Render entries list respecting filter
+            function render() {
+                // apply filter
+                const filtered = entries.filter(it => {
+                    if (currentFilter === 'all') return true;
+                    return it.type === currentFilter;
+                });
+
+                // compute totals using filtered? Requirement ambiguous; we'll show totals for ALL entries (more useful)
+                computeTotals(entries);
+
+                // clear
+                entriesContainer.innerHTML = '';
+
+                if (filtered.length === 0) {
+                    entriesContainer.innerHTML = '<div class="text-center p-6 muted">No entries to show.</div>';
+                    return;
+                }
+
+                for (const it of filtered) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'flex items-center justify-between p-3 rounded-lg border border-gray-100';
+
+                    const left = document.createElement('div');
+                    left.className = 'flex items-center gap-3';
+
+                    const badge = document.createElement('div');
+                    badge.className = 'w-10 h-10 rounded-full flex items-center justify-center font-semibold text-white';
+                    badge.style.background = it.type === 'income' ? 'linear-gradient(135deg,#ECFCCB,#86EFAC)' : 'linear-gradient(135deg,#FEE2E2,#FCA5A5)';
+                    badge.textContent = it.type === 'income' ? '₹' : '−';
+
+                    const meta = document.createElement('div');
+                    meta.innerHTML = `<div class="font-medium">${escapeHtml(it.description)}</div>
+                          <div class="text-xs muted">${new Date(it.createdAt).toLocaleString()}</div>`;
+
+                    left.appendChild(badge);
+                    left.appendChild(meta);
+
+                    const right = document.createElement('div');
+                    right.className = 'flex items-center gap-3';
+                    const amountEl = document.createElement('div');
+                    amountEl.className = it.type === 'income' ? 'font-bold income' : 'font-bold expense';
+                    amountEl.textContent = (it.type === 'income' ? '' : '-') + fmtCurrency(Math.abs(it.amount));
+
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'px-3 py-1 rounded bg-indigo-50 text-indigo-600 text-sm';
+                    editBtn.textContent = 'Edit';
+                    editBtn.onclick = () => editEntry(it.id);
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'px-3 py-1 rounded bg-red-50 text-red-600 text-sm';
+                    delBtn.textContent = 'Delete';
+                    delBtn.onclick = () => deleteEntry(it.id);
+
+                    right.appendChild(amountEl);
+                    right.appendChild(editBtn);
+                    right.appendChild(delBtn);
+
+                    wrap.appendChild(left);
+                    wrap.appendChild(right);
+
+                    entriesContainer.appendChild(wrap);
+                }
+            }
+
+            // Escape text to avoid XSS in tiny demo
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            // Handle filter changes
+            document.querySelectorAll('input[name="filter"]').forEach(r => {
+                r.addEventListener('change', (e) => {
+                    currentFilter = e.target.value;
+                    render();
+                });
+            });
+
+            // Reset button clears the form
+            resetBtn.addEventListener('click', () => {
+                form.reset();
+                entryIdInput.value = '';
+                document.getElementById('save-btn').textContent = 'Add';
+            });
+
+
+
+            // Init
+            form.addEventListener('submit', upsertEntry);
+            loadEntries();
+            render();
+
+            // Expose helpers for debugging (optional)
+            window.__ie_app = {
+                loadEntries, saveEntries, entries, render
+            };
+        </script>
+</body>
+
+</html>
